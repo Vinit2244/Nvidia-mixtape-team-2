@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kernel of a Dream — NVIDIA Internship Mixtape</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,700&family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #080808;
+  --surface: #111111;
+  --surface-2: #181818;
+  --surface-3: #242424;
+  --accent: #1ed760;
+  --accent-glow: rgba(30,215,96,0.18);
+  --accent-border: rgba(30,215,96,0.22);
+  --text-1: #ffffff;
+  --text-2: #b3b3b3;
+  --text-3: #5a5a5a;
+  --border: rgba(255,255,255,0.07);
+  --border-2: rgba(255,255,255,0.04);
+  --player-h: 90px;
+  --header-h: 60px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+[data-theme="light"] {
+  --bg: #F2EFE9;
+  --surface: #FFFFFF;
+  --surface-2: #F7F4EF;
+  --surface-3: #EDE9E2;
+  --accent: #0D8F50;
+  --accent-glow: rgba(13,143,80,0.12);
+  --accent-border: rgba(13,143,80,0.22);
+  --text-1: #0a0a0a;
+  --text-2: #4a4a4a;
+  --text-3: #aaaaaa;
+  --border: rgba(0,0,0,0.07);
+  --border-2: rgba(0,0,0,0.04);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.5s ease, color 0.5s ease;
+}
+
+/* ───── SCROLLBAR ───── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+
+/* ───── HEADER ───── */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transition: background 0.5s;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse-dot 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 6px var(--accent), 0 0 12px var(--accent-glow); }
+  50% { box-shadow: 0 0 14px var(--accent), 0 0 28px var(--accent-glow); }
+}
+
+.header-album-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+
+.header-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-border);
+  padding: 3px 9px;
+  border-radius: 100px;
+}
+
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.theme-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 7px 14px;
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+  border-color: var(--accent-border);
+}
+
+.theme-btn .t-icon { font-size: 13px; }
+
+/* ───── LAYOUT ───── */
+.layout {
+  display: block;
+  /* grid-template-columns: 320px 1fr; */
+  min-height: 100vh;
+  padding-top: var(--header-h);
+  padding-bottom: var(--player-h);
+}
+
+/* ───── LEFT PANEL ───── */
+.left-panel {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  width: 320px;
+  height: calc(100vh - var(--header-h) - var(--player-h));
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 22px 24px 28px;
+  gap: 18px;
+  overflow: hidden;
+}
+
+.album-info {}
+
+.album-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.album-big-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--text-1);
+  margin-bottom: 6px;
+}
+
+.album-desc {
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+
+/* Video */
+.video-wrap {
+  flex: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  background: var(--surface-2);
+  min-height: 0;
+  border: 1px solid var(--border);
+}
+
+.video-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-ph {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  background: linear-gradient(160deg, #0d0d1a 0%, #111827 50%, #0d1f0d 100%);
+}
+
+[data-theme="light"] .video-ph {
+  background: linear-gradient(160deg, #e8eaf6 0%, #e3f2fd 50%, #e8f5e9 100%);
+}
+
+.video-ph-icon {
+  font-size: 46px;
+  animation: float-up 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 4px 16px rgba(30,215,96,0.3));
+}
+
+@keyframes float-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.video-ph p {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+  line-height: 1.6;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="light"] .video-ph p { color: rgba(0,0,0,0.2); }
+
+.video-glow {
+  position: absolute;
+  bottom: -10px; left: 50%;
+  transform: translateX(-50%);
+  width: 50%; height: 30px;
+  background: var(--accent);
+  filter: blur(28px);
+  opacity: 0.15;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.stat-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.stat-divider {
+  width: 1px; height: 28px;
+  background: var(--border);
+}
+
+/* ───── RIGHT PANEL ───── */
+.right-panel {
+  margin-left: 320px;
+  width: calc(100% - 320px);
+  padding: 32px 32px 24px;
+  min-height: calc(100vh - var(--header-h) - var(--player-h));
+}
+
+/* Divider decoration */
+.deco-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.deco-line { flex: 1; height: 1px; background: var(--border); }
+
+.deco-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.deco-star { color: var(--accent); font-size: 10px; }
+
+/* Section header */
+.section-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-h {
+  font-family: 'Playfair Display', serif;
+  font-size: 21px;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.section-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+}
+
+/* ───── MEMBER CARDS ───── */
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+
+.member-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px 18px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+  position: relative;
+  overflow: hidden;
+  animation: fadein 0.5s ease both;
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.member-card:nth-child(1) { animation-delay: 0.04s; }
+.member-card:nth-child(2) { animation-delay: 0.08s; }
+.member-card:nth-child(3) { animation-delay: 0.12s; }
+.member-card:nth-child(4) { animation-delay: 0.16s; }
+.member-card:nth-child(5) { animation-delay: 0.20s; }
+.member-card:nth-child(6) { animation-delay: 0.24s; }
+.member-card:nth-child(7) { animation-delay: 0.28s; }
+
+.member-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-glow);
+  opacity: 0;
+  transition: opacity 0.22s;
+}
+
+.member-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow);
+}
+
+.member-card:hover::after { opacity: 1; }
+
+/* Avatar */
+.avatar-ring {
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  border: 2px solid var(--border);
+  transition: border-color 0.22s;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.member-card:hover .avatar-ring {
+  border-color: var(--accent);
+}
+
+.avatar-face {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  border-radius: 50%;
+}
+
+/* when actual image is provided */
+.avatar-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+/* Member info */
+.member-info { flex: 1; min-width: 0; z-index: 1; }
+
+.member-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.member-song {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.member-artist {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-arrow {
+  font-size: 14px;
+  color: var(--text-3);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.2s;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.member-card:hover .card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--accent);
+}
+
+/* ───── TRACKLIST ───── */
+.tracklist-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+
+.tl-head {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-head span {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.tl-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr;
+  padding: 12px 20px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-2);
+  transition: background 0.15s;
+  cursor: default;
+}
+
+.tl-row:last-child { border-bottom: none; }
+.tl-row:hover { background: var(--surface-2); }
+
+.tl-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.tl-song {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.tl-by {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* Equalizer bars */
+.eq {
+  display: none;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.eq.visible { display: flex; }
+
+.eq-b {
+  width: 3px; border-radius: 1px;
+  background: var(--accent);
+  animation: eq-bounce 0.7s ease-in-out infinite alternate;
+}
+
+.eq-b:nth-child(1) { height: 6px; animation-delay: 0s; }
+.eq-b:nth-child(2) { height: 13px; animation-delay: 0.12s; }
+.eq-b:nth-child(3) { height: 9px; animation-delay: 0.25s; }
+.eq-b:nth-child(4) { height: 14px; animation-delay: 0.08s; }
+
+@keyframes eq-bounce {
+  from { transform: scaleY(0.35); }
+  to { transform: scaleY(1); }
+}
+
+/* Footer note */
+.footer-note {
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+  padding: 8px 0 4px;
+}
+
+/* ───── STICKY PLAYER ───── */
+.player {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--player-h);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  gap: 16px;
+  z-index: 90;
+  transition: background 0.5s;
+}
+
+/* Player Left */
+.player-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+  flex: 1;
+}
+
+.player-art {
+  width: 50px; height: 50px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #0d1117, #161b22, #0d1f0d);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+ 
+[data-theme="light"] .player-art {
+  background: linear-gradient(135deg, #e8f5e9, #e3f2fd, #fce4ec);
+}
+ 
+.player-art::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 40%, var(--accent-glow));
+}
+
+.now-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.p-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.p-artist {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.player-heart {
+  background: none; border: none;
+  font-size: 15px; cursor: pointer;
+  color: var(--text-3);
+  transition: all 0.2s;
+  padding: 4px;
+}
+
+.player-heart:hover { color: var(--accent); transform: scale(1.2); }
+.player-heart.liked { color: var(--accent); }
+
+/* Player Center */
+.player-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 2;
+  max-width: 500px;
+}
+
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.ctrl {
+  background: none; border: none;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.ctrl:hover { color: var(--text-1); transform: scale(1.12); }
+
+.play-pause {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--text-1);
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--bg);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.play-pause:hover { transform: scale(1.07); }
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.p-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  min-width: 32px;
+  text-align: center;
+}
+
+/* Range input styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px;
+  background: var(--text-1);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb { opacity: 1; }
+
+/* Player Right */
+.player-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 160px;
+}
+
+.vol-icon {
+  font-size: 14px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.player-art svg { color: var(--accent); }
+
+#vol-slider { width: 80px; max-width: 80px; flex: none; }
+
+/* ───── MODAL ───── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+[data-theme="light"] .overlay {
+  background: rgba(0,0,0,0.45);
+}
+
+.overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: 440px;
+  max-width: 92vw;
+  overflow: hidden;
+  transform: translateY(24px) scale(0.95);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
+}
+
+.overlay.open .modal {
+  transform: translateY(0) scale(1);
+}
+
+.modal-img-area {
+  width: 100%;
+  max-height: 420px;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-img-area img {
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+  display: block;
+}
+
+.modal-img-ph {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px;
+}
+
+.modal-img-ph .big-emoji { font-size: 60px; }
+
+.modal-img-ph p {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  line-height: 1.7;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="light"] .modal-img-ph p { color: rgba(0,0,0,0.25); }
+
+/* Overlay gradient on modal image */
+.modal-img-area::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
+}
+
+.modal-body { padding: 20px 22px 22px; }
+
+.modal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.modal-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-border);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+
+.modal-member-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.modal-badge {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-border);
+  padding: 2px 7px;
+  border-radius: 100px;
+  margin-top: 3px;
+}
+
+.modal-song-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+
+.modal-song-icon { font-size: 16px; }
+
+.modal-song-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-1);
+  font-weight: 400;
+}
+
+.modal-song-artist {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.modal-quote {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.65;
+  border-left: 2px solid var(--accent);
+  padding-left: 13px;
+  margin-bottom: 18px;
+  font-style: italic;
+}
+
+.modal-close-btn {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.modal-close-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+  border-color: var(--accent-border);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="header-brand">
+    <div class="header-dot"></div>
+    <span class="header-album-name">Kernel of a Dream</span>
+    <span class="header-tag">Mixtape · 2026</span>
+  </div>
+  <div class="header-right">
+    <button class="theme-btn" onclick="toggleTheme()">
+      <span class="t-icon" id="t-icon">☀️</span>
+      <span id="t-label">Light</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════ LAYOUT ═══════════════ -->
+<div class="layout">
+
+  <!-- ── LEFT PANEL ── -->
+  <div class="left-panel">
+    <div class="album-info">
+      <div class="album-eyebrow">Album</div>
+      <div class="album-big-title">Kernel of<br>a Dream</div>
+      <div class="album-desc">First internship feelings<br>NVIDIA · Summer 2026</div>
+    </div>
+
+    <!-- Album Cover Video -->
+    <div class="video-wrap" id="video-wrap">
+      <!--
+        ╔═══════════════════════════════════════════╗
+        ║  REPLACE THE div.video-ph below with:     ║
+        ║  <video autoplay loop muted playsinline   ║
+        ║    src="YOUR_COVER_VIDEO.mp4"></video>    ║
+        ╚═══════════════════════════════════════════╝
+      -->
+      <video autoplay loop muted playsinline src="cover_video.mp4"></video>
+      <div class="video-glow"></div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-num">7</div>
+        <div class="stat-label">Members</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-num">7</div>
+        <div class="stat-label">Songs</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-num">1</div>
+        <div class="stat-label">Mashup</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="right-panel">
+
+    <div class="deco-divider">
+      <div class="deco-line"></div>
+      <span class="deco-star">✦</span>
+      <span class="deco-text">First Internship Feelings</span>
+      <span class="deco-star">✦</span>
+      <div class="deco-line"></div>
+    </div>
+
+    <div class="section-hd">
+      <div class="section-h">The Crew</div>
+      <div class="section-hint">click a member → see their feelings</div>
+    </div>
+
+    <!-- Members Grid -->
+    <div class="members-grid" id="members-grid"></div>
+
+    <!-- Tracklist -->
+    <div class="deco-divider">
+      <div class="deco-line"></div>
+      <span class="deco-text">Track Listing</span>
+      <div class="deco-line"></div>
+    </div>
+
+    <div class="tracklist-wrap">
+      <div class="tl-head">
+        <span>#</span>
+        <span>Song</span>
+        <span>Selected by</span>
+      </div>
+      <div id="tracklist"></div>
+    </div>
+
+    <div class="footer-note">
+      ✦ &nbsp; All songs reflect individual feelings about the upcoming internship at NVIDIA &nbsp; ✦
+    </div>
+
+  </div>
+</div><!-- end .layout -->
+
+<!-- ═══════════════ STICKY PLAYER ═══════════════ -->
+<div class="player">
+  <!-- Left -->
+  <div class="player-left">
+    <div class="player-art">
+      <svg width="26" height="22" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Headband arc -->
+        <path d="M4 12 C4 5.4 8.9 1 13 1 C17.1 1 22 5.4 22 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+        <!-- Left ear cup body -->
+        <rect x="1" y="11" width="5" height="8" rx="2.5" fill="currentColor" opacity="0.9"/>
+        <!-- Right ear cup body -->
+        <rect x="20" y="11" width="5" height="8" rx="2.5" fill="currentColor" opacity="0.9"/>
+        <!-- Left ear cup inner highlight -->
+        <rect x="2.5" y="13" width="2" height="4" rx="1" fill="currentColor" opacity="0.3"/>
+        <!-- Right ear cup inner highlight -->
+        <rect x="21.5" y="13" width="2" height="4" rx="1" fill="currentColor" opacity="0.3"/>
+      </svg>
+    </div>
+    <div>
+      <div class="now-label">Now Playing</div>
+      <div class="p-title">The Full Mashup</div>
+      <div class="p-artist">Kernel of a Dream · All 7</div>
+    </div>
+    <button class="player-heart" id="heart-btn" onclick="toggleHeart()">♡</button>
+  </div>
+
+  <!-- Center -->
+  <div class="player-center">
+    <div class="ctrl-row">
+      <button class="ctrl" onclick="skipBack()" title="–10s">⏮</button>
+      <button class="play-pause" id="play-btn" onclick="togglePlay()">▶</button>
+      <button class="ctrl" onclick="skipForward()" title="+10s">⏭</button>
+    </div>
+    <div class="progress-row">
+      <span class="p-time" id="cur-time">0:00</span>
+      <input type="range" id="prog-slider" min="0" max="100" value="0" step="0.1" oninput="seek(this.value)">
+      <span class="p-time" id="tot-time">0:00</span>
+    </div>
+  </div>
+
+  <!-- Right -->
+  <div class="player-right">
+    <span class="vol-icon">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Speaker body -->
+        <path d="M2 5.5 H5 L9 2 V14 L5 10.5 H2 Z" fill="currentColor" opacity="0.85"/>
+        <!-- Sound wave 1 (small) -->
+        <path d="M11 5.8 C11.8 6.6 11.8 9.4 11 10.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+        <!-- Sound wave 2 (large) -->
+        <path d="M13 3.8 C14.8 5.4 14.8 10.6 13 12.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+      </svg>
+    </span>
+    <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1" oninput="setVol(this.value)">
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL ═══════════════ -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-img-area" id="m-img"></div>
+    <div class="modal-body">
+      <div class="modal-avatar-row">
+        <div class="modal-avatar" id="m-avatar"></div>
+        <div>
+          <div class="modal-member-name" id="m-name"></div>
+          <div class="modal-badge">NVIDIA Intern 2026</div>
+        </div>
+      </div>
+      <div class="modal-song-line">
+        <span class="modal-song-icon">♪</span>
+        <div>
+          <div class="modal-song-text" id="m-song"></div>
+          <div class="modal-song-artist" id="m-artist"></div>
+        </div>
+      </div>
+      <div class="modal-quote" id="m-quote"></div>
+      <button class="modal-close-btn" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden Audio Element -->
+<!--
+  ╔══════════════════════════════════════════════╗
+  ║  REPLACE src="" with your mashup file path:  ║
+  ║  e.g. src="mashup.mp3"                       ║
+  ╚══════════════════════════════════════════════╝
+-->
+<audio id="audio" src="mashup.mpeg"></audio>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════╗
+// ║   ✏️  EDIT THIS SECTION — Replace with your actual data      ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const MEMBERS = [
+  {
+    id: 1,
+    name: "Vinit",
+    song: "Unwritten",
+    artist: "Natasha Bedingfield",
+    emoji: "😊",
+    avatarBg: "linear-gradient(135deg,#667eea,#764ba2)",
+    avatarSrc: "vinit_avatar.png",
+    imageSrc:  "vinit_wrt_words.jpeg",
+    // quote: "Replace this with Vinit's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 2,
+    name: "Aroshish",
+    song: "Breakaway",
+    artist: "Kelly Clarkson",
+    emoji: "🤓",
+    avatarBg: "linear-gradient(135deg,#f093fb,#f5576c)",
+    avatarSrc: "aroshish_avatar.png",
+    imageSrc:  "aroshish_wrt_words.png",
+    // quote: "Replace this with Aroshish's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 3,
+    name: "Harshika",
+    song: "Mera Safar",
+    artist: "Iqlipse Nova",
+    emoji: "🚀",
+    avatarBg: "linear-gradient(135deg,#4facfe,#00f2fe)",
+    avatarSrc: "harshika_avatar.png",
+    imageSrc:  "harshika_wrt_words.jpeg",
+    // quote: "Replace this with Harshika's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 4,
+    name: "Deepika",
+    song: "Puthiyoru lokam",
+    artist: "Hesham Abdul Wahab",
+    emoji: "🌟",
+    avatarBg: "linear-gradient(135deg,#43e97b,#38f9d7)",
+    avatarSrc: "deepika_avatar.png",
+    imageSrc:  "deepika_wrt_words.png",
+    // quote: "Replace this with Deepika's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 5,
+    name: "Sparsh",
+    song: "Let it happen",
+    artist: "Tame Impala",
+    emoji: "🎯",
+    avatarBg: "linear-gradient(135deg,#fa709a,#fee140)",
+    avatarSrc: "sparsh_avatar.png",
+    imageSrc:  "sparsh_wrt_words.png",
+    // quote: "Replace this with Sparsh's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 6,
+    name: "Sarah",
+    song: "Roar",
+    artist: "Katy Perry",
+    emoji: "💡",
+    avatarBg: "linear-gradient(135deg,#a18cd1,#fbc2eb)",
+    avatarSrc: "sarah_avatar.png",
+    imageSrc:  "sarah_wrt_words.png",
+    // quote: "Replace this with Sarah's thoughts about the NVIDIA internship.",
+  },
+  {
+    id: 7,
+    name: "Poojitha",
+    song: "On Top of the World",
+    artist: "Imagine Dragons",
+    emoji: "🌈",
+    avatarBg: "linear-gradient(135deg,#fd7c6e,#fda085)",
+    avatarSrc: "poojitha_avatar.png",
+    imageSrc:  "poojitha_wrt_words.jpg",
+    // quote: "Replace this with Poojitha's thoughts about the NVIDIA internship.",
+  },
+];
+
+// ═══════════════════════════════════════
+// RENDER CARDS
+// ═══════════════════════════════════════
+const grid = document.getElementById('members-grid');
+const tl = document.getElementById('tracklist');
+
+MEMBERS.forEach((m) => {
+  // --- Member Card ---
+  const card = document.createElement('div');
+  card.className = 'member-card';
+  card.onclick = () => openModal(m);
+
+  const avatarInner = m.avatarSrc
+    ? `<img class="avatar-img" src="${m.avatarSrc}" alt="${m.name}"
+         onerror="this.outerHTML='<span style=font-size:26px>${m.emoji}</span>'">`
+    : `<span style="font-size:26px">${m.emoji}</span>`;
+
+  card.innerHTML = `
+    <div class="avatar-ring">
+      <div class="avatar-face" style="background:${m.avatarBg}">${avatarInner}</div>
+    </div>
+    <div class="member-info">
+      <div class="member-num">0${m.id} · Member</div>
+      <div class="member-name">${m.name}</div>
+      <div class="member-song">${m.song}</div>
+      <div class="member-artist">${m.artist}</div>
+    </div>
+    <span class="card-arrow">→</span>
+  `;
+  grid.appendChild(card);
+
+  // --- Tracklist Row ---
+  const row = document.createElement('div');
+  row.className = 'tl-row';
+  row.id = `tl-${m.id}`;
+  row.innerHTML = `
+    <span class="tl-num">${m.id}</span>
+    <div>
+      <div class="tl-song">${m.song}</div>
+      <div class="tl-by">${m.artist}</div>
+    </div>
+    <div>${m.name}</div>
+  `;
+  tl.appendChild(row);
+});
+
+// ═══════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════
+let currentMember = null;
+
+function openModal(m) {
+  currentMember = m;
+  document.getElementById('m-name').textContent = m.name;
+  document.getElementById('m-song').textContent = m.song;
+  document.getElementById('m-artist').textContent = m.artist;
+  document.getElementById('m-quote').textContent = m.quote;
+
+  // Avatar
+  const av = document.getElementById('m-avatar');
+  av.style.background = m.avatarBg;
+  av.innerHTML = m.avatarSrc
+    ? `<img src="${m.avatarSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.outerHTML='<span style=font-size:22px>${m.emoji}</span>'">`
+    : `<span style="font-size:22px">${m.emoji}</span>`;
+
+  // Feelings image
+  const imgArea = document.getElementById('m-img');
+  if (m.imageSrc) {
+    imgArea.innerHTML = `<img src="${m.imageSrc}" alt="${m.name}'s internship feelings"
+      onerror="this.parentElement.innerHTML=fallbackImg('${m.emoji}','${m.avatarBg}')">`;
+  } else {
+    imgArea.innerHTML = `
+      <div class="modal-img-ph" style="background:${m.avatarBg}">
+        <div class="big-emoji">${m.emoji}</div>
+        <p>Add <strong>imageSrc</strong> to member<br>data to display their<br>internship feelings image</p>
+      </div>`;
+  }
+
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function fallbackImg(emoji, bg) {
+  return `<div class="modal-img-ph" style="background:${bg}">
+    <div class="big-emoji">${emoji}</div>
+    <p>Image not found</p>
+  </div>`;
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('overlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ═══════════════════════════════════════
+// AUDIO PLAYER
+// ═══════════════════════════════════════
+const audio = document.getElementById('audio');
+const playBtn = document.getElementById('play-btn');
+const prog = document.getElementById('prog-slider');
+const curTime = document.getElementById('cur-time');
+const totTime = document.getElementById('tot-time');
+const volSlider = document.getElementById('vol-slider');
+
+let playing = false;
+
+function togglePlay() {
+  if (!audio.src || audio.src === window.location.href) {
+    // No audio yet — toggle state visually
+    playing = !playing;
+    playBtn.innerHTML = playing ? '⏸' : '▶';
+    return;
+  }
+  if (playing) {
+    audio.pause(); playing = false; playBtn.innerHTML = '▶';
+  } else {
+    audio.play().catch(() => {}); playing = true; playBtn.innerHTML = '⏸';
+  }
+}
+
+function skipBack()    { if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime - 10); }
+function skipForward() { if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime + 10); }
+
+function seek(v) {
+  if (audio.duration) audio.currentTime = (v / 100) * audio.duration;
+  sliderGrad(prog, v);
+}
+
+function setVol(v) {
+  audio.volume = v;
+  sliderGrad(volSlider, v * 100);
+}
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2,'0')}`;
+}
+
+function sliderGrad(el, pct) {
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface-3').trim();
+  el.style.background = `linear-gradient(to right, ${accent} ${pct}%, ${surface} ${pct}%)`;
+}
+
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  prog.value = pct;
+  curTime.textContent = fmtTime(audio.currentTime);
+  sliderGrad(prog, pct);
+});
+
+audio.addEventListener('loadedmetadata', () => {
+  totTime.textContent = fmtTime(audio.duration);
+});
+
+audio.addEventListener('ended', () => {
+  playing = false; playBtn.innerHTML = '▶';
+  prog.value = 0; sliderGrad(prog, 0);
+});
+
+// Init volume gradient
+sliderGrad(volSlider, 100);
+
+// Heart button
+let hearted = false;
+function toggleHeart() {
+  hearted = !hearted;
+  const btn = document.getElementById('heart-btn');
+  btn.textContent = hearted ? '♥' : '♡';
+  btn.classList.toggle('liked', hearted);
+}
+
+// ═══════════════════════════════════════
+// THEME TOGGLE
+// ═══════════════════════════════════════
+function toggleTheme() {
+  const html = document.documentElement;
+  const dark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('t-icon').textContent = dark ? '🌙' : '☀️';
+  document.getElementById('t-label').textContent = dark ? 'Dark' : 'Light';
+  // Refresh slider gradients after color var change
+  setTimeout(() => {
+    sliderGrad(prog, +prog.value);
+    sliderGrad(volSlider, +volSlider.value * 100);
+  }, 20);
+}
+</script>
+</body>
+</html>
